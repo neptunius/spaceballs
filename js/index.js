@@ -1,7 +1,7 @@
-let scene, camera, raycaster, renderer, directionalLight, lightPosition4D, cubeArray;
+let scene, camera, raycaster, renderer, directionalLight, lightPosition4D, cubeArray, wallArray;
 let width = window.innerWidth;
 let height = window.innerHeight;
-let minSize = 5;
+let minSize = 10;
 let maxSize = 80;
 let maxVelocity = 1;
 const cameraZ = 300;
@@ -12,8 +12,8 @@ let spawnArea = {
   right: width / 2,
   bottom: height / -2,
   top: height / 2,
-  far: 50,
-  near: 0
+  far: 250,
+  near: -250
 }
 
 // WINDOW RESIZE
@@ -44,8 +44,9 @@ window.addEventListener('resize', function () {
 // MOUSE CLICK
 window.addEventListener('click', function () {
   if (INTERSECTED) {
-    INTERSECTED.gravity = true
-    INTERSECTED.reroll();
+    INTERSECTED.stayInPlace = false; // true;
+    // INTERSECTED.gravity = true
+    // INTERSECTED.reroll();
   }
 }, false);
 
@@ -56,29 +57,34 @@ document.addEventListener('mousemove', function (e) {
   mouse.y = -(e.clientY / height) * 2 + 1;
 }, false);
 
+function randomFloat(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
 
 class Cube {
   constructor() {
 
     this.build = function (args) {
       args = args || {};
-      this.size = args.size || this.getRandomIntFromRange(this.minSize, this.maxSize);
+      this.size = args.size || randomInt(this.minSize, this.maxSize);
       // Cube mesh geometric properties
       this.cube.scale.x = this.size / 10;
       this.cube.scale.y = this.size / 10;
       this.cube.scale.z = this.size / 10;
-      this.cube.position.x = args.posX || this.getRandomIntFromRange(spawnArea.left - maxSize, spawnArea.right + maxSize);
-      this.cube.position.y = args.posY || this.getRandomIntFromRange(spawnArea.bottom - maxSize, spawnArea.top + maxSize);
-      this.cube.position.z = args.posZ || this.getRandomIntFromRange(spawnArea.far, spawnArea.near);
-      this.cube.rotation.x = args.rotX || this.getRandomIntFromRange(0, 360);
-      this.cube.rotation.y = args.rotY || this.getRandomIntFromRange(0, 360);
-      this.cube.rotation.z = args.rotZ || this.getRandomIntFromRange(0, 360);
+      this.cube.position.x = args.posX || randomInt(spawnArea.left - maxSize, spawnArea.right + maxSize);
+      this.cube.position.y = args.posY || randomInt(spawnArea.bottom - maxSize, spawnArea.top + maxSize);
+      this.cube.position.z = args.posZ || randomInt(spawnArea.far, spawnArea.near);
+      this.cube.rotation.x = args.rotX || randomInt(0, 360);
+      this.cube.rotation.y = args.rotY || randomInt(0, 360);
+      this.cube.rotation.z = args.rotZ || randomInt(0, 360);
       // Rotational velocity
-      this.rx = args.rx || (this.getRandomIntFromRange(-100, 100) / 5000);
-      this.ry = args.ry || (this.getRandomIntFromRange(-100, 100) / 5000);
-      this.rz = args.rz || (this.getRandomIntFromRange(-100, 100) / 5000);
+      this.rotation = new THREE.Vector3(randomFloat(-.02, .02), randomFloat(-.02, .02), randomFloat(-.02, .02));
       // Translational velocity
-      this.velocity = new THREE.Vector3(this.getRandomIntFromRange(-3, 3), this.getRandomIntFromRange(-3, 3), 0);
+      this.velocity = new THREE.Vector3(randomFloat(-5, 5), randomFloat(-5, 5), 0);
       // Larger cubes have higher friction and move slower
       this.friction = 1 + this.size / 50;
       this.cube.gravity = false;
@@ -89,31 +95,32 @@ class Cube {
       this.minSize = args.minSize || 10;
       this.maxSize = args.maxSize || 10;
       let scale = 0.2; // maxSize / 8;
+      this.geometry = new THREE.SphereBufferGeometry(75 * scale / 2, 20, 10);
       // this.geometry = new THREE.BoxBufferGeometry(10, 10, 10);
       // this.geometry = new THREE.IcosahedronBufferGeometry(maxSize / 8, 1); // radius, ?
       // this.geometry = createShapeGeometry(6, maxSize / 2); // n, circumradius
 
       // Next 12 geometries from https://threejs.org/examples/#webgl_geometries
-      this.geometries = [];
-      this.geometries.push(new THREE.SphereBufferGeometry(75 * scale / 2, 20, 10));
-      // this.geometries.push(new THREE.IcosahedronBufferGeometry(75 * scale/2, 1));
-      // this.geometries.push(new THREE.OctahedronBufferGeometry(75 * scale/2, 2));
-      this.geometries.push(new THREE.TetrahedronBufferGeometry(75 * scale, 0));
-      // this.geometries.push(new THREE.PlaneBufferGeometry(100 * scale, 100 * scale, 4, 4));
-      this.geometries.push(new THREE.BoxBufferGeometry(100 * scale / 2, 100 * scale / 2, 100 * scale / 2, 4, 4, 4));
-      // this.geometries.push(new THREE.CircleBufferGeometry(50 * scale, 20, 0, Math.PI * 2));
-      this.geometries.push(new THREE.RingBufferGeometry(10 * scale, 50 * scale, 20, 5, 0, Math.PI * 2));
-      this.geometries.push(new THREE.CylinderBufferGeometry(20 * scale, 20 * scale, 80 * scale, 40, 5));
-      var points = [];
-      for (var i = 0; i < 50; i++) {
-        points.push(new THREE.Vector2(Math.sin(i * 0.2) * Math.sin(i * 0.1) * 15 * scale + 50 * scale, (i - 5) * 2));
-      }
-      // this.geometries.push(new THREE.LatheBufferGeometry(points, 20));
-      this.geometries.push(new THREE.TorusBufferGeometry(40 * scale, 15 * scale, 20, 20));
-      this.geometries.push(new THREE.TorusKnotBufferGeometry(50 * scale, 10 * scale, 50, 20));
-
-      let pick = this.getRandomIntFromRange(1, this.geometries.length);
-      this.geometry = this.geometries[pick-1];
+      // this.geometries = [];
+      // this.geometries.push(new THREE.SphereBufferGeometry(75 * scale / 2, 20, 10)); // sphere/ball
+      // this.geometries.push(new THREE.IcosahedronBufferGeometry(75 * scale / 2, 1)); // icosahedron/bumpy sphere
+      // this.geometries.push(new THREE.OctahedronBufferGeometry(75 * scale / 2, 2)); // octahedron/bumpy sphere
+      // this.geometries.push(new THREE.TetrahedronBufferGeometry(75 * scale, 0)); // tetrahedron/pyramid
+      // this.geometries.push(new THREE.PlaneBufferGeometry(100 * scale, 100 * scale, 4, 4)); // plane/rectangle
+      // this.geometries.push(new THREE.BoxBufferGeometry(100 * scale / 2, 100 * scale / 2, 100 * scale / 2, 4, 4, 4)); // cube/box
+      // this.geometries.push(new THREE.CircleBufferGeometry(50 * scale, 20, 0, Math.PI * 2)); // circle/disk
+      // this.geometries.push(new THREE.RingBufferGeometry(10 * scale, 50 * scale, 20, 5, 0, Math.PI * 2)); // ring/record
+      // this.geometries.push(new THREE.CylinderBufferGeometry(20 * scale, 20 * scale, 80 * scale, 40, 5)); // cylinder/tube
+      // var points = []; // points for LatheBufferGeometry
+      // for (var i = 0; i < 50; i++) {
+      //   points.push(new THREE.Vector2(Math.sin(i * 0.2) * Math.sin(i * 0.1) * 15 * scale + 50 * scale, (i - 5) * 2));
+      // }
+      // this.geometries.push(new THREE.LatheBufferGeometry(points, 20)); // lathe/vase
+      // this.geometries.push(new THREE.TorusBufferGeometry(40 * scale, 15 * scale, 20, 20)); // torus/doughnut
+      // this.geometries.push(new THREE.TorusKnotBufferGeometry(50 * scale, 10 * scale, 50, 20)); // knot/pretzel
+      //
+      // let pick = randomInt(1, this.geometries.length);
+      // this.geometry = this.geometries[pick-1];
 
       const cubeColors = randomColor({
         count: 2,
@@ -127,14 +134,14 @@ class Cube {
       });
 
       this.cube = new THREE.Mesh(this.geometry, this.material);
-      this.cube.stayInPlace = false;
+      this.cube.stayInPlace = false; // initial movement
       this.build(args);
       scene.add(this.cube);
     };
 
     this.reroll = function () {
       // Mulligan the shape (reroll geometry)
-      let pick = this.getRandomIntFromRange(1, this.geometries.length);
+      let pick = randomInt(1, this.geometries.length);
       this.geometry = this.geometries[pick - 1];
     };
 
@@ -142,13 +149,13 @@ class Cube {
       // this.reroll();
 
       // Adjust rotation by rotational velocity
-      this.cube.rotation.x += this.rx;
-      this.cube.rotation.y += this.ry;
-      this.cube.rotation.z += this.rz;
+      this.cube.rotation.x += this.rotation.x;
+      this.cube.rotation.y += this.rotation.y;
+      this.cube.rotation.z += this.rotation.z;
 
       // Randomly perturb velocity (gettin jiggy wit it) but clamp if too fast (don't get TOO jiggy)
-      this.velocity.x += (this.velocity.x < maxVelocity ? this.getRandomFloatFromRange(-0.2, 0.2) : 0);
-      this.velocity.y += (this.velocity.y < maxVelocity ? this.getRandomFloatFromRange(-0.2, 0.2) : 0);
+      this.velocity.x += (this.velocity.x < maxVelocity ? randomFloat(-0.2, 0.2) : 0);
+      this.velocity.y += (this.velocity.y < maxVelocity ? randomFloat(-0.2, 0.2) : 0);
 
       // Axis Movement
       if (this.cube.gravity) {
@@ -162,25 +169,36 @@ class Cube {
         this.cube.position.z += this.velocity.z;
       }
 
+      // WRAPAROUND
       // If cube went out of bounds, move to opposite side of window
-      if (this.cube.position.y >= spawnArea.top + maxSize) { // top
-        this.cube.position.y = spawnArea.bottom - maxSize; // bottom
-      } else if (this.cube.position.y < spawnArea.bottom - maxSize) { // bottom
-        this.cube.position.y = spawnArea.top + maxSize; // top
-      } else if (this.cube.position.x < spawnArea.left - maxSize) { // left
-        this.cube.position.x = spawnArea.right + maxSize; // right
-      } else if (this.cube.position.x >= spawnArea.right + maxSize) { // right
-        this.cube.position.x = spawnArea.left - maxSize; // left
+      // if (this.cube.position.y >= spawnArea.top + maxSize) { // top
+      //   this.cube.position.y = spawnArea.bottom - maxSize; // bottom
+      // } else if (this.cube.position.y < spawnArea.bottom - maxSize) { // bottom
+      //   this.cube.position.y = spawnArea.top + maxSize; // top
+      // } else if (this.cube.position.x < spawnArea.left - maxSize) { // left
+      //   this.cube.position.x = spawnArea.right + maxSize; // right
+      // } else if (this.cube.position.x >= spawnArea.right + maxSize) { // right
+      //   this.cube.position.x = spawnArea.left - maxSize; // left
+      // }
+
+      // BOUNCE
+      // If cube went out of bounds, reverse its direction
+      if (this.cube.position.x - this.size/1.414 <= spawnArea.left && this.velocity.x < 0) { // left
+        this.velocity.x *= -1;
+      } else if (this.cube.position.x + this.size/1.414 >= spawnArea.right && this.velocity.x > 0) { // right
+        this.velocity.x *= -1;
+      }
+      if (this.cube.position.y + this.size/1.414 >= spawnArea.top && this.velocity.y > 0) { // top
+        this.velocity.y *= -1;
+      } else if (this.cube.position.y - this.size/1.414 <= spawnArea.bottom && this.velocity.y < 0) { // bottom
+        this.velocity.y *= -1;
+      }
+      if (this.cube.position.z - this.size/1.414 <= spawnArea.near && this.velocity.z < 0) { // near
+        this.velocity.z *= -1;
+      } else if (this.cube.position.z + this.size/1.414 >= spawnArea.far && this.velocity.z > 0) { // far
+        this.velocity.z *= -1;
       }
     };
-
-    this.getRandomFloatFromRange = function(min, max) {
-      return Math.random() * (max - min) + min;
-    }
-
-    this.getRandomIntFromRange = function (min, max) {
-      return Math.floor(Math.random() * (max - min + 1) + min);
-    }
   }
 }
 
@@ -189,6 +207,7 @@ class Cube {
 function createShapeGeometry(n, circumradius) {
 
   var shape = new THREE.Shape(),
+    sides = 6,
     vertices = [],
     x;
 
@@ -225,6 +244,19 @@ function init() {
       maxSize: maxSize
     });
   }
+
+  // Create walls
+  wallArray = [];
+  // let backWall = new THREE.PlaneBufferGeometry(width, height, 4, 4);
+  var geometry = new THREE.PlaneBufferGeometry( width/2, height/2 );
+  var material = new THREE.MeshBasicMaterial( {color: 0x0066dd, side: THREE.DoubleSide} );
+  var plane = new THREE.Mesh( geometry, material );
+  plane.position.x = (spawnArea.left + spawnArea.right) / 2;
+  plane.position.y = (spawnArea.bottom + spawnArea.top) / 2;
+  plane.position.z = spawnArea.far; // (spawnArea.far + spawnArea.near) / 2;
+  // plane.rotation.y = Math.PI * .25;
+  // wallArray.push(plane);
+  // scene.add(plane);
 
   // Add ambient and directional light to the scene.
   let ambientLight = new THREE.AmbientLight('#ffffff', 0.3);
@@ -265,11 +297,63 @@ function init() {
   document.body.appendChild(renderer.domElement);
 }
 
+function difference(pointA, pointB) {
+  let dx = pointA.x - pointB.x;
+  let dy = pointA.y - pointB.y;
+  let dz = pointA.z - pointB.z;
+  return new THREE.Vector3(dx, dy, dz);
+}
+
+function distance(pointA, pointB) {
+  let dx2 = Math.pow(pointA.x - pointB.x, 2);
+  let dy2 = Math.pow(pointA.y - pointB.y, 2);
+  let dz2 = Math.pow(pointA.z - pointB.z, 2);
+  return Math.sqrt(dx2 + dy2 + dz2);
+}
+
 // ANIMATE SCENE
 function animate() {
   // Animate the cubes.
   for (let i = 0; i < cubeArray.length; i++) {
     cubeArray[i].animate();
+  }
+
+  // Bounce the cubes off each other.
+  for (let i = 0; i < cubeArray.length; i++) {
+    for (let j = i + 1; j < cubeArray.length; j++) {
+      let cubeA = cubeArray[i];
+      let cubeB = cubeArray[j];
+      // Check if centers are closer than sum of radii
+      let dist = distance(cubeA.cube.position, cubeB.cube.position);
+      // let dist = cubeA.cube.position.distanceTo(cubeB.cube.position);
+      if (dist < (cubeA.size + cubeB.size) / 1.414) {
+        // Reverse each cube's velocity
+        cubeA.velocity.x *= -1;
+        cubeA.velocity.y *= -1;
+        cubeB.velocity.x *= -1;
+        cubeB.velocity.y *= -1;
+        // Set each cube's velocity along the directional vector between centers
+        let diff = difference(cubeA.cube.position, cubeB.cube.position);
+        // let diff = cubeA.cube.position.sub(cubeB.cube.position);
+        let diffLength = diff.length();
+        let scaleA = cubeA.velocity.length() / diffLength;
+        let scaleB = cubeB.velocity.length() / diffLength;
+        cubeA.velocity.x = scaleA * diff.x;
+        cubeA.velocity.y = scaleA * diff.y;
+        cubeA.velocity.z = scaleA * diff.z;
+        cubeB.velocity.x = scaleB * -diff.x;
+        cubeB.velocity.y = scaleB * -diff.y;
+        cubeB.velocity.z = scaleB * -diff.z;
+      }
+    }
+  }
+
+  // Rotate the walls.
+  for (let i = 0; i < wallArray.length; i++) {
+    wall = wallArray[i];
+    wall.rotation.x += Math.PI/360;
+    wall.rotation.y += Math.PI/360;
+    wall.rotation.z += Math.PI/360;
   }
 
   // Look for mouse inteactions. See https://threejs.org/examples/#webgl_interactive_cubes.
@@ -284,7 +368,7 @@ function animate() {
       }
       INTERSECTED = intersects[0].object;
       INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
-      INTERSECTED.material.color.setHex(0x913599);
+      INTERSECTED.material.color.setHex(0x0080ff); // 0x913599);
       INTERSECTED.stayInPlace = true;
       document.getElementById("cubeCanvas").style.cursor = "pointer";
     }
