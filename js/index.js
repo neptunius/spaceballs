@@ -1,10 +1,10 @@
-let scene, camera, raycaster, renderer, directionalLight, lightPosition4D, cubeArray, wallArray;
+let scene, camera, raycaster, renderer, directionalLight, cubeArray, wallArray;
 let width = window.innerWidth;
 let height = window.innerHeight;
 let minSize = 10;
 let maxSize = 80;
 let maxVelocity = 1;
-const cameraZ = 300;
+const cameraZ = 500;
 const cubeQuantity = Math.floor(width / 15);
 
 let spawnArea = {
@@ -12,8 +12,8 @@ let spawnArea = {
   right: width / 2,
   bottom: height / -2,
   top: height / 2,
-  far: 250,
-  near: -250
+  far: cameraZ - maxSize,
+  near: -(cameraZ - maxSize)
 }
 
 // WINDOW RESIZE
@@ -28,9 +28,6 @@ window.addEventListener('resize', function () {
 
   directionalLight.position.x = spawnArea.left;
   directionalLight.position.y = spawnArea.top;
-
-  lightPosition4D.x = spawnArea.left;
-  lightPosition4D.y = spawnArea.top;
 
   camera.left = spawnArea.left;
   camera.right = spawnArea.right;
@@ -145,8 +142,52 @@ class Cube {
       this.geometry = this.geometries[pick - 1];
     };
 
+    this.recolor = function () {
+      // Position-based RGB color
+      let color;
+      let pn = this.cube.position.clone().normalize();
+      let offset = new THREE.Vector3(1, 1, 1).multiplyScalar(-0.4);
+      // pn = pn.sub(offset).normalize();
+      pn = pn.multiplyScalar(0.5);
+      pn = pn.sub(offset);
+      color = new THREE.Color(pn.x, pn.y, pn.z);
+
+      // Direction-based RGB color
+      // let vn = this.velocity.clone().normalize();
+      // vn = vn.multiplyScalar(0.5);
+      // vn = vn.sub(offset);
+      // color = new THREE.Color(vn.x, vn.y, vn.z);
+
+      // Speed-based color
+      // let speed = this.velocity.length();
+      // let speedLimit = 10;
+      // let speedClamped = Math.min(speed, speedLimit) / speedLimit;
+
+      // Speed-based RGB color
+      // let red = speedClamped;
+      // let blue = (1 - speedClamped);
+      // color = new THREE.Color(red, 0, blue);
+
+      // Speed-based HSL color
+      // let hue = 255 * (1 - speedClamped);
+      // color = new THREE.Color("hsl("+hue+", 100%, 50%)");
+
+      // Right-left red-blue
+      // let red = (vn.x + 1) / 2;
+      // let blue = (1 - red) - 0.5;
+      // color = new THREE.Color(red, 0, blue);
+
+      // Set the material's color
+      this.material.color = color;
+
+      // Set the material's emissive color to a darker shade of the same color
+      // let lightColor = new THREE.Color(color.r * 2, color.g * 2, color.b * 2);
+      let darkColor = new THREE.Color(color.r / 2, color.g / 2, color.b / 2);
+      this.material.emissive = darkColor;
+    };
+
     this.animate = function () {
-      // this.reroll();
+      this.recolor();
 
       // Adjust rotation by rotational velocity
       this.cube.rotation.x += this.rotation.x;
