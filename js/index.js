@@ -109,8 +109,6 @@ window.addEventListener('resize', function () {
 
 // ANIMATE SHAPES
 function animateShapes() {
-  // if (!shapes || shapes.length === 0)
-  //   return;
   // Animate all shapes so they move, bounce, and rotate
   for (let i = 0; i < shapes.length; i++) {
     shapes[i].animate(boundingBox);
@@ -123,11 +121,6 @@ function animateShapes() {
   }
 }
 
-function difference(pointA, pointB) {
-  let dx = pointA.x - pointB.x;
-  let dy = pointA.y - pointB.y;
-  let dz = pointA.z - pointB.z;
-  return new THREE.Vector3(dx, dy, dz);
 // ANIMATE SCENE
 function animateScene() {
   // Animate shapes
