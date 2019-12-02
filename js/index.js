@@ -1,6 +1,6 @@
 let scene, renderer, camera, directionalLight;
 let raycaster, mouse, intersectedShape;
-let animating = false;
+let animating = true;
 let canvas = document.getElementById("canvas");
 let width = window.innerWidth;
 let height = window.innerHeight;
