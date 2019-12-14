@@ -7,7 +7,7 @@ let height = window.innerHeight;
 let depth = (width + height) / 2;
 let boundingBox = {};
 let minSize = 10;
-let maxSize = 80;
+let maxSize = Math.min(width, height) / 10;
 let numShapes = Math.floor(width * height / 10000);
 let shapes = [];
 
@@ -182,6 +182,8 @@ function handleMouse() {
         intersectedShape.frozen = false;
         intersectedShape.material.color.setHex(intersectedShape.priorColor);
       }
+      if (!intersectedObjects[0].object instanceof Shape)
+        return;
       // Freeze this shape and highlight it with a different color
       intersectedShape = intersectedObjects[0].object;
       intersectedShape.frozen = true;

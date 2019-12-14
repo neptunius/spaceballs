@@ -17,9 +17,9 @@ class Shape {
 
   static randomShape() {
     const shapes = [ // 'plane', 'circle', 'ring', // 2D shapes
-      'cone', 'cylinder', 'sphere', 'box', // 3D shapes
+      // 'cone', 'cylinder', 'sphere', 'box', // 3D shapes
       'tetrahedron', 'octahedron', 'dodecahedron', 'icosahedron', // Polyhedra
-      'torus', 'knot', 'random knot', 'lathe', // Irregular shapes
+      'torus', 'knot', 'random knot', 'random knot', 'lathe', // Irregular shapes
     ];
     return randomValue(shapes);
   }
@@ -208,8 +208,8 @@ class Shape {
       that.velocity.y *= -1;
       that.velocity.z *= -1;
       // Set each shape's velocity along the directional vector between centers
-      const thisScale = this.velocity.length() / distance;
-      const thatScale = that.velocity.length() / distance;
+      const thisScale = that.velocity.length() / distance;
+      const thatScale = this.velocity.length() / distance;
       this.velocity.x = thisScale * difference.x;
       this.velocity.y = thisScale * difference.y;
       this.velocity.z = thisScale * difference.z;
