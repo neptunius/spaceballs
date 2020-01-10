@@ -1,18 +1,24 @@
+const maxSpeed = 5;
+
 class Shape {
   // INITIALIZE SHAPE
   constructor(args) {
     args = args || {};
-    this.size = args.size || randomInt(10, 50);
+    this.scene = args.scene;
     // Initialize geometry and mesh
     this.initGeometry(args);
     this.initMesh(args);
     // Translational velocity
-    this.velocity = randomVector3(-5, 5);
+    this.velocity = randomVector3(-maxSpeed, maxSpeed);
     // Rotational velocity
     this.rotation = randomVector3(-0.02, 0.02);
     // Stop movement during mouse interactions
     this.mesh.frozen = false;
-    this.recolor();
+    // Set color once if given or recolor automatically
+    if (args.color && args.color instanceof THREE.Color)
+      this.setColor(args.color);
+    else
+      this.recolor();
   };
 
   static randomShape() {
@@ -27,11 +33,11 @@ class Shape {
   initGeometry(args) {
     args = args || {};
     // Set up geometry properties
-    const size = this.size;
+    const size = this.size = args.size || randomInt(10, 50);
     const radius = this.size;
     const height = this.size * Math.sqrt(2);
     // Create geometry based on shape name
-    const shape = args.shape || Shape.randomShape();
+    const shape = this.shape = args.shape || Shape.randomShape();
     // 2D shapes
     if (shape === 'plane' || shape === 'square' || shape === 'rectangle')
       this.geometry = new THREE.PlaneBufferGeometry(size * 1.8, size * 1.8);
@@ -64,8 +70,8 @@ class Shape {
       this.geometry = new THREE.TorusKnotBufferGeometry(radius * 2/3, radius / 6, 64, 12);
     else if (shape === 'random knot' || shape === 'random pretzel') {
       // See https://threejs.org/docs/#api/en/geometries/TorusKnotBufferGeometry
-      const p = randomInt(1, 8); // How many times to wind around axis of rotational symmetry
-      const q = randomInt(1, 8); // How many times to wind around circle in interior of torus
+      const p = this.p = args.p !== undefined ? args.p : randomInt(1, 8); // How many times to wind around axis of rotational symmetry
+      const q = this.q = args.q !== undefined ? args.q : randomInt(1, 8); // How many times to wind around circle in interior of torus
       this.geometry = new THREE.TorusKnotBufferGeometry(radius * 2/3, radius / 8, 128, 12, p, q);
     }
     // 3D parametric rotational shapes
@@ -92,17 +98,41 @@ class Shape {
     // Create material and mesh
     this.material = new THREE.MeshPhongMaterial({
       color: args.color || colors[0],
-      emissive: colors[1],
+      emissive: args.emissive || colors[1],
       side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     // Shape mesh coordinate properties
-    this.mesh.position.x = randomInt(boundingBox.left + this.size, boundingBox.right - this.size);
-    this.mesh.position.y = randomInt(boundingBox.bottom + this.size, boundingBox.top - this.size);
-    this.mesh.position.z = randomInt(boundingBox.back + this.size, boundingBox.front - this.size);
-    this.mesh.rotation.x = randomInt(0, 360);
-    this.mesh.rotation.y = randomInt(0, 360);
-    this.mesh.rotation.z = randomInt(0, 360);
+    if (args.position && args.position instanceof THREE.Vector3) {
+      this.mesh.position.x = args.position.x;
+      this.mesh.position.y = args.position.y;
+      this.mesh.position.z = args.position.z;
+    } else {
+      this.mesh.position.x = randomInt(boundingBox.left + this.size, boundingBox.right - this.size);
+      this.mesh.position.y = randomInt(boundingBox.bottom + this.size, boundingBox.top - this.size);
+      this.mesh.position.z = randomInt(boundingBox.back + this.size, boundingBox.front - this.size);
+    }
+    if (args.rotation && args.rotation instanceof THREE.Vector3) {
+      this.mesh.rotation.x = args.rotation.x;
+      this.mesh.rotation.y = args.rotation.y;
+      this.mesh.rotation.z = args.rotation.z;
+    } else {
+      this.mesh.rotation.x = randomInt(0, 360);
+      this.mesh.rotation.y = randomInt(0, 360);
+      this.mesh.rotation.z = randomInt(0, 360);
+    }
+  }
+
+  reinitShape(args) {
+    this.scene.remove(this.mesh);
+    this.initGeometry(args);
+    this.initMesh({
+      color: this.material.color,
+      emissive: this.material.emissive,
+      position: this.mesh.position,
+      rotation: this.mesh.rotation,
+    });
+    this.scene.add(this.mesh);
   }
 
   // ANIMATE SHAPE
@@ -111,6 +141,7 @@ class Shape {
     this.bounce(boundingBox);
     this.rotate();
     this.recolor();
+    // this.recolorPosition();
   }
 
   move() {
@@ -208,36 +239,77 @@ class Shape {
       that.velocity.y *= -1;
       that.velocity.z *= -1;
       // Set each shape's velocity along the directional vector between centers
-      const thisScale = that.velocity.length() / distance;
-      const thatScale = this.velocity.length() / distance;
+      let thisScale = this.velocity.length() / distance;
+      let thatScale = that.velocity.length() / distance;
+      // let theScale = (thisScale + thatScale) / 2;
+      // thisScale = theScale;
+      // thatScale = theScale;
       this.velocity.x = thisScale * difference.x;
       this.velocity.y = thisScale * difference.y;
       this.velocity.z = thisScale * difference.z;
       that.velocity.x = thatScale * -difference.x;
       that.velocity.y = thatScale * -difference.y;
       that.velocity.z = thatScale * -difference.z;
+      // Trigger each shape's reaction
+      this.react(that);
+      that.react(this);
+      const averageColor = new THREE.Color(
+        (this.material.color.r + that.material.color.r) / 2,
+        (this.material.color.g + that.material.color.g) / 2,
+        (this.material.color.b + that.material.color.b) / 2
+      );
+      // this.setColor(averageColor);
+      // that.setColor(averageColor);
+    }
+  }
+
+  react(that) {
+    return;
+    // Reinitialize sphere geometry and mesh
+    if (this.shape === 'sphere') {
+      this.reinitShape({
+        shape: this.shape,
+        size: this.size, // / 2, // shrink size
+      });
+    }
+    // Reinitialize random knot geometry and mesh
+    else if (this.shape === 'random knot') {
+      this.reinitShape({
+        shape: this.shape,
+        p: this.p, // + 1,
+        q: this.q + 1, // wind knot one more turn
+      });
     }
   }
 
   recolor() {
     if (!this.mesh.frozen)
       this.recolorPosition();
+      // this.recolorSpeed();
   }
 
   recolorPosition() {
     // Position-based color in RGB space
-    const offset = new THREE.Vector3(1, 1, 1).multiplyScalar(0.4);
-    const position = this.mesh.position.clone()
-    const posNorm = position.normalize().multiplyScalar(0.5).add(offset);
-    const color = new THREE.Color(posNorm.x, posNorm.y, posNorm.z);
+    const position = this.mesh.position.clone();
+    // Set up scale cube and its back-bottom-left corner
+    const scale = new THREE.Vector3(width, height, depth);
+    const corner = new THREE.Vector3(boundingBox.left, boundingBox.bottom, boundingBox.back);
+    // Translate position into scale cube then normalize into RGB space
+    const posRGB = position.sub(corner).divide(scale);
+    const color = new THREE.Color(posRGB.x, posRGB.y, posRGB.z);
+    // Project normalized position onto surface of unit sphere then RGB space
+    // const offset = new THREE.Vector3(1, 1, 1).multiplyScalar(0.4);
+    // const posNorm = position.normalize().multiplyScalar(0.5).add(offset);
+    // const color = new THREE.Color(posNorm.x, posNorm.y, posNorm.z);
     this.setColor(color);
   }
 
   recolorSpeed() {
     // Speed-based color in HSL space
     const speed = this.velocity.length();
-    const speedLimit = 7;
-    const speedClamped = Math.min(speed, speedLimit) / speedLimit;
+    // const speedLimit = 7;
+    // const speedClamped = Math.min(speed, speedLimit) / speedLimit;
+    const speedClamped = Math.min(speed, maxSpeed + 1) / (maxSpeed + 1);
     const hue = 255 * (1 - speedClamped);
     const color = new THREE.Color("hsl(" + hue + ", 100%, 50%)");
     this.setColor(color);

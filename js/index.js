@@ -1,15 +1,21 @@
 let scene, renderer, camera, directionalLight;
 let raycaster, mouse, intersectedShape;
-let animating = true;
+let animating = false; //true;
 let canvas = document.getElementById("canvas");
 let width = window.innerWidth;
 let height = window.innerHeight;
 let depth = (width + height) / 2;
 let boundingBox = {};
 let minSize = 10;
-let maxSize = Math.min(width, height) / 10;
+let maxSize = Math.min(width, height) / 15;
 let numShapes = Math.floor(width * height / 10000);
 let shapes = [];
+
+console.log("width:", width);
+console.log("height:", height);
+console.log("depth:", depth);
+console.log("maxSize:", maxSize);
+console.log("numShapes:", numShapes);
 
 // CREATE BOUNDING BOX
 function initBoundingBox() {
@@ -26,6 +32,7 @@ function initBoundingBox() {
     front: depth / 2,
     back: -depth / 2,
   };
+  console.log("boundingBox: ", boundingBox);
 }
 
 // SET UP RENDERER
@@ -78,12 +85,42 @@ function updateLightsCamera() {
 
 // CREATE SHAPES
 function initShapes() {
-  for (let i = 0; i < numShapes; i++) {
-    // Create a shape of random size
-    const size = randomInt(minSize, maxSize);
-    const shape = new Shape({size: size});
-    shapes.push(shape);
-    scene.add(shape.mesh);
+  // const rows = numShapes/12, cols = numShapes/rows;//, tabs = 8;
+  const rows = 4, cols = 6, tabs = 5;
+  const rowSize = height/rows/2, colSize = width/cols/2, tabSize = depth/tabs/2;
+  numShapes = rows * cols * tabs;
+  console.log("rows:", rows, "rowSize:", rowSize);
+  console.log("cols:", cols, "colSize:", colSize);
+  console.log("tabs:", tabs, "tabSize:", tabSize);
+  for (let row = 1-rows; row < rows; row += 2) {
+    for (let col = 1-cols; col < cols; col += 2) {
+      for (let tab = 1-tabs; tab < tabs; tab += 2) {
+        // Create a shape of random size
+        // const size = randomInt(minSize, maxSize);
+        // tab:  1-tabs  --  0  --  tabs-1
+        // size: minSize -- avg -- maxSize
+        // (tab + tabs) / 2*tabs
+        const shape = new Shape({
+          scene: scene,
+          shape: 'random knot', // 'sphere',
+          p: (row+1 + rows),
+          q: (col+1 + cols),
+          // size based on depth, small close and large far
+          size: maxSize * (1-tab + tabs) / (2 * tabs),
+          // position based on column, row, and table like a lattice
+          position: new THREE.Vector3(col * colSize, row * rowSize, tab * tabSize).add(randomVector3(-50, 50)),
+          // rotation: randomVector3(), // new THREE.Vector3(),
+          color: new THREE.Color(
+            (col + cols)/(2 * cols),
+            (row + rows)/(2 * rows),
+            (tab + tabs)/(2 * tabs),
+          )
+        });
+        // console.log("position:", shape.mesh.position);
+        shapes.push(shape);
+        scene.add(shape.mesh);
+      }
+    }
   }
 }
 
