@@ -9,9 +9,9 @@ class Shape {
     this.initGeometry(args);
     this.initMesh(args);
     // Translational velocity
-    this.velocity = randomVector3(-maxSpeed, maxSpeed);
+    this.velocity = args.velocity || randomVector3(-maxSpeed, maxSpeed);
     // Rotational velocity
-    this.rotation = randomVector3(-0.02, 0.02);
+    this.rotation = args.rotation || randomVector3(-0.02, 0.02);
     // Stop movement during mouse interactions
     this.mesh.frozen = false;
     // Set color once if given or recolor automatically
@@ -34,13 +34,14 @@ class Shape {
     args = args || {};
     // Set up geometry properties
     const size = this.size = args.size || randomInt(10, 50);
-    const radius = this.size;
-    const height = this.size * Math.sqrt(2);
+    const radius = this.radius = args.radius || size;
+    const height = this.height = args.height || size * Math.sqrt(2);
+    const width = this.width = args.width || height; // size * 1.8;
     // Create geometry based on shape name
     const shape = this.shape = args.shape || Shape.randomShape();
     // 2D shapes
     if (shape === 'plane' || shape === 'square' || shape === 'rectangle')
-      this.geometry = new THREE.PlaneBufferGeometry(size * 1.8, size * 1.8);
+      this.geometry = new THREE.PlaneBufferGeometry(width, height);
     else if (shape === 'circle' || shape === 'disk')
       this.geometry = new THREE.CircleBufferGeometry(radius, 24);
     else if (shape === 'ring' || shape === 'record')
@@ -96,14 +97,20 @@ class Shape {
       luminosity: 'dark',
     });
     // Create material and mesh
-    this.material = new THREE.MeshPhongMaterial({
-      color: args.color || colors[0],
-      emissive: args.emissive || colors[1],
-      side: THREE.DoubleSide,
+    const material = args.material || 'normal';
+    const Material = material === 'toon' ? THREE.MeshToonMaterial
+                   : material === 'phong' ? THREE.MeshPhongMaterial
+                   : material === 'lambert' ? THREE.MeshLambertMaterial
+                   : THREE.MeshNormalMaterial;
+    this.material = new Material({
+      // color: args.color || colors[0],
+      // emissive: args.emissive || colors[1],
+      side: args.side || THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     // Shape mesh coordinate properties
     if (args.position && args.position instanceof THREE.Vector3) {
+      this.initPosition = args.position;
       this.mesh.position.x = args.position.x;
       this.mesh.position.y = args.position.y;
       this.mesh.position.z = args.position.z;
@@ -113,6 +120,7 @@ class Shape {
       this.mesh.position.z = randomInt(boundingBox.back + this.size, boundingBox.front - this.size);
     }
     if (args.rotation && args.rotation instanceof THREE.Vector3) {
+      this.initRotation = args.rotation;
       this.mesh.rotation.x = args.rotation.x;
       this.mesh.rotation.y = args.rotation.y;
       this.mesh.rotation.z = args.rotation.z;
@@ -150,6 +158,17 @@ class Shape {
       this.mesh.position.x += this.velocity.x;
       this.mesh.position.y += this.velocity.y;
       this.mesh.position.z += this.velocity.z;
+    }
+  }
+
+  moveTo(position) {
+    if (position instanceof THREE.Vector3) {
+      // Adjust position coordinates to given position
+      this.mesh.position.x = position.x;
+      this.mesh.position.y = position.y;
+      this.mesh.position.z = position.z;
+    } else {
+      console.log('Position must be instance of THREE.Vector3:', position);
     }
   }
 
@@ -239,8 +258,9 @@ class Shape {
       that.velocity.y *= -1;
       that.velocity.z *= -1;
       // Set each shape's velocity along the directional vector between centers
-      let thisScale = this.velocity.length() / distance;
-      let thatScale = that.velocity.length() / distance;
+      let thisScale = that.velocity.length() / distance;
+      let thatScale = this.velocity.length() / distance;
+      // TODO: Make this/that swapping depend on shapes' relative mass
       // let theScale = (thisScale + thatScale) / 2;
       // thisScale = theScale;
       // thatScale = theScale;
@@ -253,13 +273,15 @@ class Shape {
       // Trigger each shape's reaction
       this.react(that);
       that.react(this);
-      const averageColor = new THREE.Color(
-        (this.material.color.r + that.material.color.r) / 2,
-        (this.material.color.g + that.material.color.g) / 2,
-        (this.material.color.b + that.material.color.b) / 2
-      );
-      // this.setColor(averageColor);
-      // that.setColor(averageColor);
+      if (this.material.color && that.material.color) {
+        const averageColor = new THREE.Color(
+          (this.material.color.r + that.material.color.r) / 2,
+          (this.material.color.g + that.material.color.g) / 2,
+          (this.material.color.b + that.material.color.b) / 2
+        );
+        this.setColor(averageColor);
+        that.setColor(averageColor);
+      }
     }
   }
 

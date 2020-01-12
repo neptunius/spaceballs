@@ -10,6 +10,7 @@ let minSize = 10;
 let maxSize = Math.min(width, height) / 15;
 let numShapes = Math.floor(width * height / 10000);
 let shapes = [];
+let tubes = [];
 
 console.log("width:", width);
 console.log("height:", height);
@@ -85,6 +86,7 @@ function updateLightsCamera() {
 
 // CREATE SHAPES
 function initShapes() {
+  // 3D lattice of shapes inside bounding box
   // const rows = numShapes/12, cols = numShapes/rows;//, tabs = 8;
   const rows = 4, cols = 6, tabs = 5;
   const rowSize = height/rows/2, colSize = width/cols/2, tabSize = depth/tabs/2;
@@ -124,13 +126,87 @@ function initShapes() {
   }
 }
 
+// CREATE BALLS
+function initBalls() {
+  const n = 8; // 8 balls make 4 tubes
+  const size = 40; // 300/(n-1); // randomInt(10, 50);
+  const speed = 6;
+  // Create n bouncing balls in a line
+  for (let i = 0; i < n; i++) {
+    // Equally spaced x, y coordinates along a width within margins
+    const x = -width*3/8 + width*3/4 * i/(n-1);
+    // const y = height*3/8 - height*3/4 * i/(n-1);
+    const y = height/8 - height*3/4 * i/(n-1)
+            + (i % 8 < 4 ? 0 : height/2)
+            - (i % 4 < 2 ? 0 : height/4)
+            + (i % 2 < 1 ? 0 : height/4);
+    // Random y coordinate within margins
+    // const y = randomInt(-height/4, height/4);
+    // Random x, y coordinates within the bounding box
+    // const x = randomInt(boundingBox.left + size, boundingBox.right - size);
+    // const y = randomInt(boundingBox.bottom + size, boundingBox.top - size);
+    // const hasVel = i == 0 ? 1 : 0;
+    const shape = new Shape({
+      scene: scene,
+      shape: 'sphere', // 'disk',
+      size: size,
+      position: new THREE.Vector3(x, y, 0),
+      // velocity: new THREE.Vector3(hasVel*15, 0, 0),
+      // velocity: new THREE.Vector3(0.9 * (n-i-1), 0, 0),
+      velocity: new THREE.Vector3(randomInt(-speed, speed), randomInt(-speed, speed), 0),
+      rotation: new THREE.Vector3(0, 0, 0), // randomVector3(),
+      // color: new THREE.Color(r, g, b),
+      material: 'phong',
+    });
+    // console.log("position:", shape.mesh.position);
+    shapes.push(shape);
+    scene.add(shape.mesh);
+  }
+  animateShapes();
+}
+
+// CREATE TUBES
+function initTubes() {
+  // Create n/2 cylindrical tubes connecting two shapes
+  for (let i = 0; i < shapes.length/2; i++) {
+    // Calculate midpoint of first two shapes
+    const posA = shapes[2*i].initPosition;
+    const posB = shapes[2*i+1].initPosition;
+    const midpoint = posA.clone().add(posB).multiplyScalar(0.5);
+    const diff = posA.clone().sub(posB);
+    const dist = diff.length();
+    // Calculate angle of rotation in x-y plane using T=O/A rule
+    // since tangent of angle = rise (opposite) / run (adjacent)
+    // angle rotXY = arctangent of rise (diff.y) / run (diff.x)
+    const rotXY = Math.PI/2 + Math.atan(diff.y / diff.x);
+    const tube = new Shape({
+      scene: scene,
+      shape: 'cylinder', // 'plane',
+      size: 40,
+      width: 80,
+      height: dist,
+      position: midpoint,
+      velocity: new THREE.Vector3(0, 0, 0), // Still
+      rotation: new THREE.Vector3(0, 0, rotXY), // Rotate in X-Y plane
+      // color: new THREE.Color(r, g, b),
+      material: 'phong',
+    });
+    tube.recolor();
+    tubes.push(tube);
+    scene.add(tube.mesh);
+  }
+  animateTubes();
+}
+
 // SET UP SCENE
 function initScene() {
   scene = new THREE.Scene();
   initBoundingBox();
   initRenderer();
   initLightsCamera();
-  initShapes();
+  // initShapes();
+  initBalls();
+  initTubes();
   initMouse();
   renderer.render(scene, camera);
 }
@@ -146,14 +222,54 @@ window.addEventListener('resize', function () {
 
 // ANIMATE SHAPES
 function animateShapes() {
-  // Animate all shapes so they move, bounce, and rotate
-  for (let i = 0; i < shapes.length; i++) {
+  const n = Math.min(2, shapes.length);
+  // Animate the first two shapes so they move, bounce and rotate
+  for (let i = 0; i < n; i++) {
     shapes[i].animate(boundingBox);
   }
+  // Animate the other shapes so they mirror the first two shapes
+  for (let i = n; i < shapes.length; i++) {
+    // Calculate mirrored position of corresponding first shape
+    const pos = shapes[i % 2].mesh.position;
+    const mirrorX = i % 4 < 2 ? 1 : -1;
+    const mirrorY = i % 8 < 4 ? 1 : -1;
+    const mirroredPos = new THREE.Vector3(mirrorX*pos.x, mirrorY*pos.y, pos.z);
+    // Adjust shape's position and recolor
+    shapes[i].moveTo(mirroredPos);
+    shapes[i].recolor();
+  }
+  // return; // No collisions
   // Collide all pairs of shapes so they bounce off each other
-  for (let i = 0; i < shapes.length; i++) {
-    for (let j = i + 1; j < shapes.length; j++) {
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
       shapes[i].collide(shapes[j]);
+    }
+  }
+}
+
+// ANIMATE TUBES
+function animateTubes() {
+  for (let i = 0; i < tubes.length; i++) {
+    // Ensure this tube has two corresponding shapes
+    if (2*i+1 < shapes.length) {
+      // Calculate midpoint of first two shapes
+      const posA = shapes[2*i].mesh.position;
+      const posB = shapes[2*i+1].mesh.position;
+      const midpoint = posA.clone().add(posB).multiplyScalar(0.5);
+      const diff = posA.clone().sub(posB);
+      const dist = diff.length();
+      tubes[i].mesh.position.x = midpoint.x;
+      tubes[i].mesh.position.y = midpoint.y;
+      tubes[i].mesh.position.z = midpoint.z;
+      tubes[i].mesh.height = dist;
+      // Calculate angle of rotation in x-y plane using T=O/A rule
+      // since tangent of angle = rise (opposite) / run (adjacent)
+      // angle rotXY = arctangent of rise (diff.y) / run (diff.x)
+      const rotXY = Math.PI/2 + Math.atan(diff.y / diff.x);
+      tubes[i].mesh.rotation.z = rotXY;
+      // Scale along x dimension to stretch the tube's length
+      tubes[i].mesh.scale.y = dist/tubes[i].height;
+      tubes[i].recolor();
     }
   }
 }
@@ -162,6 +278,7 @@ function animateShapes() {
 function animateScene() {
   // Animate shapes
   animateShapes();
+  animateTubes();
   // Handle mouse interactions
   // handleMouse();
   // Render the scene
@@ -179,12 +296,12 @@ function initMouse() {
 }
 
 // HANDLE MOUSE MOVEMENT
-document.addEventListener('mousemove', function (event) {
-  event.preventDefault();
-  // Translate mouse screen coordinates to 3D space coordinates
-  mouse.x = (event.clientX / width) * 2 - 1;
-  mouse.y = -(event.clientY / height) * 2 + 1;
-}, false);
+// document.addEventListener('mousemove', function (event) {
+//   event.preventDefault();
+//   // Translate mouse screen coordinates to 3D space coordinates
+//   mouse.x = (event.clientX / width) * 2 - 1;
+//   mouse.y = -(event.clientY / height) * 2 + 1;
+// }, false);
 
 // HANDLE MOUSE CLICK
 window.addEventListener('click', function () {
