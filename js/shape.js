@@ -1,5 +1,3 @@
-const maxSpeed = 5;
-
 class Shape {
   // INITIALIZE SHAPE
   constructor(args) {
@@ -15,11 +13,32 @@ class Shape {
     // Stop movement during mouse interactions
     this.mesh.frozen = false;
     // Set color once if given or recolor automatically
+    // console.log(args.color);
     if (args.color && args.color instanceof THREE.Color)
       this.setColor(args.color);
     else
       this.recolor();
-  };
+  }
+
+  clone(args) {
+    // Deep copy but override values with arguments
+    args = args || {};
+    return new Shape({
+      scene: args.scene || this.scene,
+      shape: args.shape || this.shape,
+      size: args.size || this.size,
+      width: args.width || this.width,
+      height: args.height || this.height,
+      radius: args.radius || this.radius,
+      scale: args.scale || this.mesh.scale, // .clone(),
+      position: args.position || this.mesh.position, // .clone(),
+      velocity: args.velocity || this.velocity, // .clone(),
+      rotation: args.rotation || this.initRotation, // .clone(),
+      color: args.color || this.material.color,
+      emissive: args.emissive || this.material.emissive,
+      material: args.material || 'phong',
+    });
+  }
 
   static randomShape() {
     const shapes = [ // 'plane', 'circle', 'ring', // 2D shapes
@@ -129,6 +148,12 @@ class Shape {
       this.mesh.rotation.y = randomInt(0, 360);
       this.mesh.rotation.z = randomInt(0, 360);
     }
+    if (args.scale && args.scale instanceof THREE.Vector3) {
+      this.scale = args.scale;
+      this.mesh.scale.x = args.scale.x;
+      this.mesh.scale.y = args.scale.y;
+      this.mesh.scale.z = args.scale.z;
+    }
   }
 
   reinitShape(args) {
@@ -139,6 +164,7 @@ class Shape {
       emissive: this.material.emissive,
       position: this.mesh.position,
       rotation: this.mesh.rotation,
+      scale: this.mesh.scale,
     });
     this.scene.add(this.mesh);
   }
@@ -148,7 +174,7 @@ class Shape {
     this.move();
     this.bounce(boundingBox);
     this.rotate();
-    this.recolor();
+    // this.recolor();
     // this.recolorPosition();
   }
 
@@ -270,6 +296,7 @@ class Shape {
       that.velocity.x = thatScale * -difference.x;
       that.velocity.y = thatScale * -difference.y;
       that.velocity.z = thatScale * -difference.z;
+      return; // Skip
       // Trigger each shape's reaction
       this.react(that);
       that.react(this);

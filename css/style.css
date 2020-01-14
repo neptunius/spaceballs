@@ -9,7 +9,7 @@ body {
 
 body {
   margin: 0;
-  background: url('../img/bkg.jpg');
+  /* background: url('../img/bkg.jpg'); */
   background-position: center center;
   background-repeat: no-repeat;
   background-attachment: fixed;
