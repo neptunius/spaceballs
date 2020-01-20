@@ -1,29 +1,29 @@
 let scene, renderer, camera, directionalLight;
 let raycaster, mouse, intersectedShape;
-let animating = false; //true;
+let animating = true;
 let canvas = document.getElementById("canvas");
 let width = window.innerWidth;
 let height = window.innerHeight;
 let depth = (width + height) / 2;
 let boundingBox = {};
-let minSize = 20;
+let minSize = 1;
 let maxSize = Math.min(width, height) / 15;
-let maxSpeed = 5;
+let maxSpeed = 8;
 let mirrorDimensions = 2;
-let numReflections = 1 << mirrorDimensions;
-let numOriginals = 4;
+let numReflections = 1 << mirrorDimensions; // ref = 2^dim
+let numOriginals = 2;
 let numShapes = numOriginals * numReflections;
 // let numShapes = Math.floor(width * height / 10000);
 let shapes = [];
 let tubes = [];
 let color = new THREE.Color(0.2, 0.4, 0.8);
-const numSegments = 1;
+const numSegments = 6;
 const shapeType = 'random knot';
-const pointType = 'sphere'; // 'disk';
-const lineType = 'tube'; // 'plane';
+const pointType = 'disk'; //'sphere'; //
+const lineType = 'plane'; //'tube'; //
 const queue = [];
-const queueSize = 20;
-const frameDelay = 10;
+const queueSize = 40;
+const frameDelay = 6;
 
 // console.log("width:", width);
 // console.log("height:", height);
@@ -143,7 +143,6 @@ function initShapes() {
 function initBalls() {
   const n = numShapes; // n balls make n/2 tubes
   const size = minSize; // 300/(n-1); // randomInt(10, 50);
-  const speed = maxSpeed;
   // Create n bouncing balls in a line
   for (let i = 0; i < n; i++) {
     // Equally spaced x, y coordinates along axis within margins
@@ -158,6 +157,15 @@ function initBalls() {
     // Random x, y coordinates within the bounding box
     const x = randomInt(boundingBox.left + size, boundingBox.right - size);
     const y = randomInt(boundingBox.bottom + size, boundingBox.top - size);
+    // Random x, y velocity within the speed limit
+    // const xVel = randomInt(-maxSpeed, maxSpeed);
+    // const yVel = randomInt(-maxSpeed, maxSpeed);
+    // Random speed and angle in polar coordinates
+    const angle = randomFloat(0, Math.PI*2);
+    const speed = randomFloat(maxSpeed/2.0, maxSpeed);
+    // Translate polar coordinates to x, y velocity
+    const xVel = speed * Math.cos(angle);
+    const yVel = speed * Math.sin(angle);
     // const hasVel = i == 0 ? 1 : 0;
     const ball = new Shape({
       scene: scene,
@@ -166,7 +174,7 @@ function initBalls() {
       position: new THREE.Vector3(x, y, 0),
       // velocity: new THREE.Vector3(hasVel*15, 0, 0),
       // velocity: new THREE.Vector3(0.9 * (n-i-1), 0, 0),
-      velocity: new THREE.Vector3(randomInt(-speed, speed), randomInt(-speed, speed), 0),
+      velocity: new THREE.Vector3(xVel, yVel, 0),
       rotation: new THREE.Vector3(0, 0, 0), // randomVector3(),
       color: color,
       material: 'phong',
@@ -263,6 +271,7 @@ function initScene() {
   initBoundingBox();
   initRenderer();
   initLightsCamera();
+  updateColor();
   // initShapes();
   initBalls();
   // initTubes();
@@ -273,7 +282,7 @@ function initScene() {
 
 // ANIMATE SCENE
 function animateScene() {
-  // updateQueue();
+  updateQueue();
   updateColor();
   // Animate shapes
   animateShapes();
@@ -298,7 +307,7 @@ window.addEventListener('resize', function () {
 
 // ANIMATE SHAPES
 function animateShapes() {
-  console.log('shapes:', shapes);
+  // console.log('shapes:', shapes);
   const n = Math.min(numOriginals, shapes.length);
   // Animate the original shapes so they move, bounce and rotate
   for (let i = 0; i < n; i++) {
@@ -406,25 +415,25 @@ function animateSegmentedTubes() {
 function updateQueue() {
   if (animating % frameDelay != 0)
     return;
+  const opacityBump = 1.0 / queueSize;
+  const opacityArgs = {transparent: true, opacity: 1 - opacityBump};
   // Copy all shapes
   const shapeCopies = [];
   for (let i = 0; i < shapes.length; i++) {
-    // break;
-    const shapeCopy = shapes[i].clone();
+    const shapeCopy = shapes[i].clone(opacityArgs);
     scene.add(shapeCopy.mesh);
     shapeCopies.push(shapeCopy);
   }
   // Copy all tubes
   for (let i = 0; i < tubes.length; i++) {
-    // break;
     if (tubes[i] instanceof Shape) {
-      const tubeCopy = tubes[i].clone();
+      const tubeCopy = tubes[i].clone(opacityArgs);
       tubeCopy.mesh.rotation.z = tubes[i].mesh.rotation.z;
       scene.add(tubeCopy.mesh);
       shapeCopies.push(tubeCopy);
     } else if (tubes[i] instanceof Array) {
       for (let j = 0; j < tubes[i].length; j++) {
-        const tubeCopy = tubes[i][j].clone();
+        const tubeCopy = tubes[i][j].clone(opacityArgs);
         tubeCopy.mesh.rotation.z = tubes[i][j].mesh.rotation.z;
         scene.add(tubeCopy.mesh);
         shapeCopies.push(tubeCopy);
@@ -441,12 +450,22 @@ function updateQueue() {
       scene.remove(oldShapes[i].mesh);
     }
   }
+  // For all shapes in each queue frame
+  for (let i = 0; i < queue.length; i++) {
+    for (let j = 0; j < queue[i].length; j++) {
+      const shape = queue[i][j];
+      // Reduce opacity to make shape more transparent
+      shape.material.opacity -= opacityBump;
+      // Push shape back to avoid z-buffer intersections
+      shape.mesh.position.z -= 10;
+    }
+  }
 }
 
 function updateColor() {
   // Advance hue to the next HSL color
-  const hue = 255 - (animating % 255);
-  color = new THREE.Color("hsl(" + hue + ", 100%, 50%)");
+  const hue = (animating + 180) % 360; // Hue in degrees
+  color = new THREE.Color("hsl(" + hue + ", 75%, 25%)");
   // Generate a random color
   // const r = randomFloat(0, 1);
   // const g = randomFloat(0, 1);

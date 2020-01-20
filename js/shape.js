@@ -37,6 +37,10 @@ class Shape {
       color: args.color || this.material.color,
       emissive: args.emissive || this.material.emissive,
       material: args.material || 'phong',
+      transparent: args.transparent || this.material.transparent,
+      opacity: args.opacity || this.material.opacity,
+      blending: args.blending || this.material.blending,
+      side: args.side || this.material.side,
     });
   }
 
@@ -124,7 +128,10 @@ class Shape {
     this.material = new Material({
       // color: args.color || colors[0],
       // emissive: args.emissive || colors[1],
-      side: args.side || THREE.DoubleSide,
+      transparent: args.transparent || false,
+      opacity: args.opacity || 1.0,
+      blending: args.blending || THREE.NormalBlending,
+      side: args.side || THREE.FrontSide, // THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     // Shape mesh coordinate properties
